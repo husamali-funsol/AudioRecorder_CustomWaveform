@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Define the peek height of the bottom sheet -->
+    <dimen name="bottom_sheet_peek_height">300dp</dimen>
+
+    <!-- Define the height of the status bar -->
+    <dimen name="status_bar_height">24dp</dimen>
+
+
+</resources>

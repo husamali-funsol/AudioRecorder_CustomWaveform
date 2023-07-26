@@ -6,17 +6,21 @@ import android.media.MediaRecorder
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.text.Editable
 import android.view.View
+import android.view.ViewTreeObserver
+import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import com.example.audiorecorder.databinding.ActivityMainBinding
-import com.example.audiorecorder.databinding.BottomSheetBinding
+import com.example.audiorecorder.databinding.BottomSheetLayoutBinding
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import java.io.File
 import java.io.IOException
@@ -29,7 +33,10 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
 
     private lateinit var amplitudes: ArrayList<Float>
     private lateinit var binding: ActivityMainBinding
-    private lateinit var bottomSheetBinding: BottomSheetBinding
+    private lateinit var bottomSheetBinding: BottomSheetLayoutBinding
+    private lateinit var bottomSheetBehavior: BottomSheetBehavior<*>
+
+
 
     private var permissions = arrayOf(
         android.Manifest.permission.RECORD_AUDIO
@@ -47,7 +54,6 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
 
     private lateinit var vibrator: Vibrator
 
-    private lateinit var bottomSheetBehavior: BottomSheetBehavior<ConstraintLayout>
 
 
 
@@ -57,20 +63,26 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        bottomSheetBinding = BottomSheetBinding.inflate(layoutInflater)
+        // Find the bottom sheet view using view binding
+        bottomSheetBinding = BottomSheetLayoutBinding.bind(binding.root.findViewById(R.id.bottomSheet))
 
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN)
 
-        val bottomSheetView: View = findViewById(R.id.bottomSheet) // Replace 'R.id.bottomSheet' with the correct ID of the bottom sheet view
-        bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetView)
-//        bottomSheetBehavior = BottomSheetBehavior.from(this.bottomSheetBinding.bottomSheet)
+        // Initialize the BottomSheetBehavior
+        bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetBinding.root)
+        bottomSheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
         bottomSheetBehavior.peekHeight = 0
-        bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+        bottomSheetBehavior.isHideable = true // Allow the bottom sheet to be hidden by dragging
+
+
 
         permissionsGranted = ActivityCompat.checkSelfPermission(this, permissions[0]) == PackageManager.PERMISSION_GRANTED
 
         if(!permissionsGranted){
             ActivityCompat.requestPermissions(this, permissions, REQUEST_CODE)
         }
+
+
 
         timer = Timer(this)
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
@@ -97,6 +109,9 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
             bottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
             binding.bottomSheetBG.visibility = View.VISIBLE
             bottomSheetBinding.etFilename.setText(filename)
+            bottomSheetBinding.etFilename.setSelection(bottomSheetBinding.etFilename.text!!.length)
+
+
 
             Toast.makeText(this, "Record Saved", Toast.LENGTH_SHORT).show()
 
@@ -134,6 +149,7 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
 
     }
 
+
     private fun save() {
         val newFilename = bottomSheetBinding.etFilename.text.toString()
         if(newFilename != filename){
@@ -148,10 +164,15 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
     }
 
     private fun dismiss(){
-        bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
         binding.bottomSheetBG.visibility = View.GONE
-
         hideKeyboard(bottomSheetBinding.etFilename)
+
+        Handler(Looper.getMainLooper()).postDelayed(
+            {
+                bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+            }
+        , 100
+        )
     }
 
     private fun pauseRecording() {
@@ -191,7 +212,7 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
         recorder = MediaRecorder()
 
         dirPath = "${externalCacheDir?.absolutePath}/"
-        var simpleDateFormat = SimpleDateFormat("DD.MM.yyyy_hh.mm.ss")
+        var simpleDateFormat = SimpleDateFormat("dd-MM-yyyy_hh-mm-ss")
         var date = simpleDateFormat.format(Date())
         filename = "audio_record_$date"
 
@@ -254,6 +275,7 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
         binding.tvTime.text = "00:00:00"
 
         amplitudes = binding.waveform.clear()
+
 
     }
 
