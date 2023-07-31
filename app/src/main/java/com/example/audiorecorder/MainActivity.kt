@@ -1,6 +1,7 @@
 package com.example.audiorecorder
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.os.Build
@@ -15,6 +16,7 @@ import android.view.View
 import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
+import android.widget.Adapter
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -22,8 +24,13 @@ import androidx.core.app.ActivityCompat
 import com.example.audiorecorder.databinding.ActivityMainBinding
 import com.example.audiorecorder.databinding.BottomSheetLayoutBinding
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -31,6 +38,7 @@ const val REQUEST_CODE = 200
 
 class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
 
+    private var duration = ""
     private lateinit var amplitudes: ArrayList<Float>
     private lateinit var binding: ActivityMainBinding
     private lateinit var bottomSheetBinding: BottomSheetLayoutBinding
@@ -39,7 +47,10 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
 
 
     private var permissions = arrayOf(
-        android.Manifest.permission.RECORD_AUDIO
+        android.Manifest.permission.RECORD_AUDIO ,
+        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+
     )
     private var permissionsGranted = false
     private lateinit var recorder: MediaRecorder
@@ -53,6 +64,8 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
     private lateinit var timer: Timer
 
     private lateinit var vibrator: Vibrator
+
+    private lateinit var db: ARDatabase
 
 
 
@@ -68,6 +81,8 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN)
 
+        db = ARDatabase.getDB(this)
+
         // Initialize the BottomSheetBehavior
         bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetBinding.root)
         bottomSheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
@@ -76,7 +91,9 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
 
 
 
-        permissionsGranted = ActivityCompat.checkSelfPermission(this, permissions[0]) == PackageManager.PERMISSION_GRANTED
+        permissionsGranted = ActivityCompat.checkSelfPermission(this, permissions[0]) == PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this, permissions[1]) == PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this, permissions[2]) == PackageManager.PERMISSION_GRANTED
 
         if(!permissionsGranted){
             ActivityCompat.requestPermissions(this, permissions, REQUEST_CODE)
@@ -98,7 +115,8 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
         }
 
         binding.btnList.setOnClickListener {
-            //TODO
+            intent = Intent(this, RecordsListActivity::class.java)
+            startActivity(intent)
 
             Toast.makeText(this, "Record List", Toast.LENGTH_SHORT).show()
         }
@@ -156,6 +174,28 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
             var newFile = File("$dirPath$newFilename.mp3")
             File("$dirPath$filename.mp3").renameTo(newFile)
         }
+
+        var filePath = "$dirPath$filename.mp3"
+        var timeStamp = Date().time
+        var ampsPath = "$dirPath$filename"
+
+
+        try {
+            var fos = FileOutputStream(ampsPath)
+            var out = ObjectOutputStream(fos)
+            out.writeObject(amplitudes)
+            fos.close()
+            out.close()
+        }
+        catch (_: IOException){}
+
+        var record = AudioRecord(newFilename, filePath, timeStamp, duration, ampsPath)
+
+        GlobalScope.launch {
+            db.audioRecordDao().Insert(record)
+        }
+        Toast.makeText(this@MainActivity, "Data Inserted in DB", Toast.LENGTH_SHORT).show()
+
     }
 
     private fun hideKeyboard(view: View) {
@@ -249,6 +289,7 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
         binding.tvTime.text = duration
 
 //        Toast.makeText(this, recorder.maxAmplitude.toString(), Toast.LENGTH_SHORT).show()
+        this.duration = duration.dropLast(3)
 
         binding.waveform.addAmplitude(recorder.maxAmplitude.toFloat())
     }
