@@ -27,6 +27,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.ObjectInputStream
@@ -260,7 +261,11 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
             setAudioSource(MediaRecorder.AudioSource.MIC)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setOutputFile("$dirPath$filename.mp3")
+            setOutputFile("$dirPath$filename.raw")
+
+            //we can save the file in wav format by changing the extension of above file
+            //change the above file extension to raw and then
+            //write the raw audio file to wav audio file.
 
             try {
                 prepare()
@@ -315,10 +320,38 @@ class MainActivity : AppCompatActivity(), Timer.onTimerTickListener {
 
         binding.tvTime.text = "00:00:00"
 
+        //save the raw audio data to wav format
+
+        val rawData = readRawAudioData("$dirPath$filename.raw")
+        saveAudioToFile(rawData, "$dirPath$filename.wav")
+
         amplitudes = binding.waveform.clear()
 
 
     }
 
+    private fun readRawAudioData(filePath: String): ByteArray {
+        try {
+            val inputStream = FileInputStream(filePath)
+            val buffer = ByteArray(inputStream.available())
+            inputStream.read(buffer)
+            inputStream.close()
+            return buffer
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        return ByteArray(0)
+    }
 
-}
+    private fun saveAudioToFile(audioData: ByteArray, filePath: String) {
+        try {
+            val outputStream = FileOutputStream(filePath)
+            outputStream.write(audioData)
+            outputStream.close()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
+
+
+    }
